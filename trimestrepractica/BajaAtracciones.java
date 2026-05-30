@@ -8,20 +8,23 @@ import java.sql.*;
  */
 public class BajaAtracciones extends JFrame {
 
-    /**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
-	private JComboBox<String> cbAtracciones; // Combo con todas las atracciones
-    private JButton btnBaja;
+    private static final long serialVersionUID = 1L;
 
-    public BajaAtracciones() {
+    private JComboBox<String> cbAtracciones;
+    private JButton btnBaja;
+    private String tipoUsuario;
+
+    public BajaAtracciones(String tipoUsuario) {
+
+        this.tipoUsuario = tipoUsuario;
+
         setTitle("Baja Atracciones");
         setSize(400, 150);
         setLayout(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         JLabel lblAtraccion = new JLabel("Seleccione Atracción:");
-        lblAtraccion.setBounds(20, 20, 140, 25);
+        lblAtraccion.setBounds(20, 20, 150, 25);
         add(lblAtraccion);
 
         cbAtracciones = new JComboBox<>();
@@ -32,56 +35,77 @@ public class BajaAtracciones extends JFrame {
         btnBaja.setBounds(140, 60, 100, 30);
         add(btnBaja);
 
-        // Evento para eliminar la atracción seleccionada
         btnBaja.addActionListener(e -> eliminarAtraccion());
 
-        // Cargar todas las atracciones al iniciar
         cargarAtracciones();
 
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-    /**
-     * Carga las atracciones existentes en la base de datos en el combo
-     */
     private void cargarAtracciones() {
+
+        cbAtracciones.removeAllItems(); // 🔥 evita duplicados
+
         String sql = "SELECT idAtraccion, nombreAtraccion FROM Atracciones";
+
         try (Connection con = ConexionBD.getConnection();
              PreparedStatement pst = con.prepareStatement(sql);
              ResultSet rs = pst.executeQuery()) {
 
             while (rs.next()) {
-                cbAtracciones.addItem(rs.getInt("idAtraccion") + " - " + rs.getString("nombreAtraccion"));
+                cbAtracciones.addItem(
+                        rs.getInt("idAtraccion") + " - " + rs.getString("nombreAtraccion")
+                );
             }
+
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error al cargar atracciones: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this,
+                    "Error al cargar atracciones: " + ex.getMessage());
         }
     }
 
-    /**
-     * Elimina la atracción seleccionada del combo de la base de datos
-     */
     private void eliminarAtraccion() {
-        int confirm = JOptionPane.showConfirmDialog(this,
+
+        if (cbAtracciones.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No hay atracciones para eliminar");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
                 "¿Seguro que desea eliminar esta atracción?",
                 "Confirmar",
-                JOptionPane.YES_NO_OPTION);
+                JOptionPane.YES_NO_OPTION
+        );
+
         if (confirm == JOptionPane.YES_OPTION) {
-            int idAtraccion = Integer.parseInt(cbAtracciones.getSelectedItem().toString().split(" - ")[0]);
-            String sql = "DELETE FROM Atracciones WHERE idAtraccion=?";
-            try (Connection con = ConexionBD.getConnection();
-                 PreparedStatement pst = con.prepareStatement(sql)) {
+
+            int idAtraccion = Integer.parseInt(
+                    cbAtracciones.getSelectedItem().toString().split(" - ")[0]
+            );
+
+            try (Connection con = ConexionBD.getConnection()) {
+
+                String sql = "DELETE FROM Atracciones WHERE idAtraccion=?";
+                PreparedStatement pst = con.prepareStatement(sql);
 
                 pst.setInt(1, idAtraccion);
                 pst.executeUpdate();
-                JOptionPane.showMessageDialog(this, "Atracción eliminada correctamente");
 
-                // Recargar combo después de eliminar
-                cbAtracciones.removeAllItems();
+                // 🔥 LOG MEJORADO
+                Log.escribir(tipoUsuario,
+                        "Baja atracción ID: " + idAtraccion);
+
+                JOptionPane.showMessageDialog(this,
+                        "Atracción eliminada correctamente");
+
                 cargarAtracciones();
+
             } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(this, "Error al eliminar atracción: " + ex.getMessage());
+                JOptionPane.showMessageDialog(this,
+                        "Error al eliminar atracción: " + ex.getMessage());
             }
         }
     }

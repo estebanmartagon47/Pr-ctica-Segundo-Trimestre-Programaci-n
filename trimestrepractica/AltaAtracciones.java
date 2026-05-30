@@ -5,58 +5,53 @@ import java.sql.*;
 
 public class AltaAtracciones extends JFrame {
 
-    /**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Campos de texto para nombre y precio
+    private String tipoUsuario;
+
     private JTextField nombreAtraccion, precio;
-
-    // ComboBox para seleccionar el parque asociado
     private JComboBox<String> cbParques;
-
-    // Botón para dar de alta
     private JButton btnAlta;
 
-    public AltaAtracciones() {
-        setTitle("Alta Atracciones");
-        setSize(350, 200);
-        setLayout(null);
+    public AltaAtracciones(String tipoUsuario) {
 
-        // Nombre de la atracción
+        this.tipoUsuario = tipoUsuario;
+
+        setTitle("Alta Atracciones");
+        setSize(350, 250);
+        setLayout(null);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+
         JLabel lblNombre = new JLabel("Nombre Atracción:");
-        lblNombre.setBounds(20, 20, 120, 25);
+        lblNombre.setBounds(20, 20, 130, 25);
         add(lblNombre);
+
         nombreAtraccion = new JTextField();
         nombreAtraccion.setBounds(150, 20, 150, 25);
         add(nombreAtraccion);
 
-        // Precio de la atracción
         JLabel lblPrecio = new JLabel("Precio:");
-        lblPrecio.setBounds(20, 60, 120, 25);
+        lblPrecio.setBounds(20, 60, 100, 25);
         add(lblPrecio);
+
         precio = new JTextField();
         precio.setBounds(150, 60, 100, 25);
         add(precio);
 
-        // Parque al que pertenece
         JLabel lblParque = new JLabel("Parque:");
-        lblParque.setBounds(20, 100, 120, 25);
+        lblParque.setBounds(20, 100, 100, 25);
         add(lblParque);
+
         cbParques = new JComboBox<>();
         cbParques.setBounds(150, 100, 150, 25);
         add(cbParques);
 
-        // Botón de alta
         btnAlta = new JButton("Agregar");
-        btnAlta.setBounds(120, 140, 100, 30);
+        btnAlta.setBounds(120, 150, 100, 30);
         add(btnAlta);
 
-        // Acción del botón
         btnAlta.addActionListener(e -> agregarAtraccion());
 
-        // Cargar parques desde la base de datos
         cargarParques();
 
         setLocationRelativeTo(null);
@@ -64,36 +59,76 @@ public class AltaAtracciones extends JFrame {
     }
 
     private void cargarParques() {
+
+        cbParques.removeAllItems();
+
         String sql = "SELECT idParque, nombreParque FROM Parques";
+
         try (Connection con = ConexionBD.getConnection();
              PreparedStatement pst = con.prepareStatement(sql);
              ResultSet rs = pst.executeQuery()) {
 
-            while(rs.next()) {
-                cbParques.addItem(rs.getInt("idParque") + " - " + rs.getString("nombreParque"));
+            while (rs.next()) {
+                cbParques.addItem(
+                        rs.getInt("idParque") + " - " + rs.getString("nombreParque")
+                );
             }
-        } catch(SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error al cargar parques: " + ex.getMessage());
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error al cargar parques: " + ex.getMessage());
         }
     }
 
     private void agregarAtraccion() {
-        String nombre = nombreAtraccion.getText();
-        double precioAtr = Double.parseDouble(precio.getText());
-        int idParque = Integer.parseInt(cbParques.getSelectedItem().toString().split(" - ")[0]);
 
-        String sql = "INSERT INTO Atracciones (nombreAtraccion, precio, idParque) VALUES (?, ?, ?)";
-        try (Connection con = ConexionBD.getConnection();
-             PreparedStatement pst = con.prepareStatement(sql)) {
+        if (cbParques.getSelectedItem() == null) {
+            JOptionPane.showMessageDialog(this, "Selecciona un parque");
+            return;
+        }
 
-            pst.setString(1, nombre);
-            pst.setDouble(2, precioAtr);
-            pst.setInt(3, idParque);
-            pst.executeUpdate();
+        try {
 
-            JOptionPane.showMessageDialog(this, "Atracción agregada correctamente");
-        } catch(SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error al agregar atracción: " + ex.getMessage());
+            String nombre = nombreAtraccion.getText();
+            double precioAtr = Double.parseDouble(precio.getText());
+
+            int idParque = Integer.parseInt(
+                    cbParques.getSelectedItem().toString().split(" - ")[0]
+            );
+
+            Date fechaCreacion = new Date(System.currentTimeMillis());
+
+            String sql = "INSERT INTO Atracciones (nombreAtraccion, precio, idParque, fechaCreacion) VALUES (?, ?, ?, ?)";
+
+            try (Connection con = ConexionBD.getConnection();
+                 PreparedStatement pst = con.prepareStatement(sql)) {
+
+                pst.setString(1, nombre);
+                pst.setDouble(2, precioAtr);
+                pst.setInt(3, idParque);
+                pst.setDate(4, fechaCreacion);
+
+                pst.executeUpdate();
+
+                // 🔥 LOG MEJORADO
+                Log.escribir(tipoUsuario,
+                        "Alta atracción: " + nombre + " | Parque ID: " + idParque);
+
+                JOptionPane.showMessageDialog(this,
+                        "Atracción agregada correctamente");
+
+                // opcional: limpiar campos
+                nombreAtraccion.setText("");
+                precio.setText("");
+
+            }
+
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Precio inválido");
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Error al agregar atracción: " + ex.getMessage());
         }
     }
 }

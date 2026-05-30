@@ -4,138 +4,275 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.sql.*;
 
+// 📄 PDF
+import com.itextpdf.text.Document;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import java.io.FileOutputStream;
+
 /**
- * Consulta y gestión de Empresas
+ * Gestión de Empresas
+ * CRUD + LOG + EXPORTACIÓN PDF + JTable
  */
 public class ConsultaEmpresa extends JFrame {
+
     private static final long serialVersionUID = 1L;
 
     private JTable tabla;
     private DefaultTableModel modelo;
-    private JButton btnAlta, btnBaja, btnModificar;
+
+    private JButton btnAlta, btnBaja, btnModificar, btnPDF;
+
     private String tipoUsuario;
 
     public ConsultaEmpresa(String tipoUsuario) {
+
         this.tipoUsuario = tipoUsuario;
+
         setTitle("Gestión de Empresas");
-        setSize(600, 400);
+        setSize(650, 450);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(null);
 
+        // ======================
+        // TABLA
+        // ======================
         modelo = new DefaultTableModel();
-        modelo.setColumnIdentifiers(new String[]{"ID", "Nombre", "Fecha", "CIF"});
+
+        modelo.setColumnIdentifiers(new String[]{
+                "ID", "Nombre", "Fecha", "CIF"
+        });
+
         tabla = new JTable(modelo);
+
         JScrollPane scroll = new JScrollPane(tabla);
-        scroll.setBounds(20, 20, 540, 200);
+        scroll.setBounds(20, 20, 580, 200);
         add(scroll);
 
-        // Botones
+        // ======================
+        // BOTONES
+        // ======================
         btnAlta = new JButton("Alta");
         btnAlta.setBounds(50, 250, 100, 30);
         add(btnAlta);
+
         btnBaja = new JButton("Baja");
-        btnBaja.setBounds(200, 250, 100, 30);
+        btnBaja.setBounds(180, 250, 100, 30);
         add(btnBaja);
+
         btnModificar = new JButton("Modificar");
-        btnModificar.setBounds(350, 250, 120, 30);
+        btnModificar.setBounds(310, 250, 120, 30);
         add(btnModificar);
+
+        btnPDF = new JButton("Exportar PDF");
+        btnPDF.setBounds(460, 250, 150, 30);
+        add(btnPDF);
 
         controlarPermisos();
         cargarEmpresas();
-        agregarListeners();
+        eventos();
+
+        setVisible(true);
     }
 
+    // ======================
+    // PERMISOS
+    // ======================
     private void controlarPermisos() {
+
         if (!tipoUsuario.equalsIgnoreCase("Administrador")) {
-            btnAlta.setEnabled(false);
+            btnAlta.setEnabled(true);
             btnBaja.setEnabled(false);
             btnModificar.setEnabled(false);
         }
     }
 
+    // ======================
+    // CARGA DATOS (JTABLE)
+    // ======================
     private void cargarEmpresas() {
+
         try (Connection con = ConexionBD.getConnection()) {
+
+            String sql = "SELECT * FROM Empresas";
             Statement st = con.createStatement();
-            ResultSet rs = st.executeQuery("SELECT * FROM Empresas");
+            ResultSet rs = st.executeQuery(sql);
+
             modelo.setRowCount(0);
+
             while (rs.next()) {
+
                 modelo.addRow(new Object[]{
                         rs.getInt("idEmpresa"),
                         rs.getString("nombreEmpresa"),
-                        rs.getString("fechaCreacion"),
+                        rs.getDate("fechaCreacion"),
                         rs.getString("cif")
                 });
             }
+
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(this, "Error al cargar empresas: " + ex.getMessage());
+            JOptionPane.showMessageDialog(this,
+                    "Error al cargar empresas: " + ex.getMessage());
         }
     }
 
-    private void agregarListeners() {
+    // ======================
+    // EVENTOS
+    // ======================
+    private void eventos() {
+
+        // 🔵 ALTA
         btnAlta.addActionListener(e -> {
-            String nombre = JOptionPane.showInputDialog(this, "Nombre empresa:");
-            String cif = JOptionPane.showInputDialog(this, "CIF:");
+
+            String nombre = JOptionPane.showInputDialog("Nombre empresa:");
+            String cif = JOptionPane.showInputDialog("CIF:");
+
             if (nombre != null && cif != null) {
+
                 try (Connection con = ConexionBD.getConnection()) {
+
                     PreparedStatement ps = con.prepareStatement(
-                            "INSERT INTO Empresas(nombreEmpresa, cif) VALUES(?, ?)");
+                            "INSERT INTO Empresas(nombreEmpresa, fechaCreacion, cif) VALUES(?, CURRENT_DATE, ?)"
+                    );
+
                     ps.setString(1, nombre);
                     ps.setString(2, cif);
+
                     ps.executeUpdate();
+
+                    // 📌 LOG
+                    Log.escribir(tipoUsuario, "Alta empresa: " + nombre);
+
                     cargarEmpresas();
+
                 } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(this, "Error al dar de alta: " + ex.getMessage());
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
                 }
             }
         });
 
+        // 🔴 BAJA
         btnBaja.addActionListener(e -> {
+
             int fila = tabla.getSelectedRow();
+
             if (fila >= 0) {
+
                 int id = (int) modelo.getValueAt(fila, 0);
-                int resp = JOptionPane.showConfirmDialog(this,
-                        "¿Seguro que quieres borrar la empresa?", "Confirmar", JOptionPane.YES_NO_OPTION);
-                if (resp == JOptionPane.YES_OPTION) {
-                    try (Connection con = ConexionBD.getConnection()) {
-                        PreparedStatement ps = con.prepareStatement(
-                                "DELETE FROM Empresas WHERE idEmpresa = ?");
-                        ps.setInt(1, id);
-                        ps.executeUpdate();
-                        cargarEmpresas();
-                    } catch (SQLException ex) {
-                        JOptionPane.showMessageDialog(this, "Error al borrar: " + ex.getMessage());
-                    }
+
+                try (Connection con = ConexionBD.getConnection()) {
+
+                    PreparedStatement ps = con.prepareStatement(
+                            "DELETE FROM Empresas WHERE idEmpresa=?"
+                    );
+
+                    ps.setInt(1, id);
+                    ps.executeUpdate();
+
+                    // 📌 LOG
+                    Log.escribir(tipoUsuario, "Baja empresa ID: " + id);
+
+                    cargarEmpresas();
+
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
                 }
+
             } else {
-                JOptionPane.showMessageDialog(this, "Selecciona primero una empresa.");
+                JOptionPane.showMessageDialog(this, "Selecciona una empresa");
             }
         });
 
+        // 🟡 MODIFICAR
         btnModificar.addActionListener(e -> {
+
             int fila = tabla.getSelectedRow();
+
             if (fila >= 0) {
+
                 int id = (int) modelo.getValueAt(fila, 0);
-                String nombre = JOptionPane.showInputDialog(this, "Nuevo nombre:",
-                        modelo.getValueAt(fila, 1));
-                String cif = JOptionPane.showInputDialog(this, "Nuevo CIF:",
-                        modelo.getValueAt(fila, 3));
+
+                String nombre = JOptionPane.showInputDialog(
+                        "Nombre:",
+                        modelo.getValueAt(fila, 1)
+                );
+
+                String cif = JOptionPane.showInputDialog(
+                        "CIF:",
+                        modelo.getValueAt(fila, 3)
+                );
+
                 if (nombre != null && cif != null) {
+
                     try (Connection con = ConexionBD.getConnection()) {
+
                         PreparedStatement ps = con.prepareStatement(
-                                "UPDATE Empresas SET nombreEmpresa=?, cif=? WHERE idEmpresa=?");
+                                "UPDATE Empresas SET nombreEmpresa=?, cif=? WHERE idEmpresa=?"
+                        );
+
                         ps.setString(1, nombre);
                         ps.setString(2, cif);
                         ps.setInt(3, id);
+
                         ps.executeUpdate();
+
+                        // 📌 LOG
+                        Log.escribir(tipoUsuario, "Modificación empresa ID: " + id);
+
                         cargarEmpresas();
+
                     } catch (SQLException ex) {
-                        JOptionPane.showMessageDialog(this, "Error al modificar: " + ex.getMessage());
+                        JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
                     }
                 }
+
             } else {
-                JOptionPane.showMessageDialog(this, "Selecciona primero una empresa.");
+                JOptionPane.showMessageDialog(this, "Selecciona una empresa");
             }
         });
+
+        // 📄 PDF
+        btnPDF.addActionListener(e -> exportarPDF());
+    }
+
+    // ======================
+    // EXPORTAR PDF
+    // ======================
+    private void exportarPDF() {
+
+        try {
+
+            Document doc = new Document();
+            PdfWriter.getInstance(doc, new FileOutputStream("Empresas.pdf"));
+
+            doc.open();
+
+            PdfPTable table = new PdfPTable(4);
+
+            table.addCell("ID");
+            table.addCell("Nombre");
+            table.addCell("Fecha");
+            table.addCell("CIF");
+
+            for (int i = 0; i < modelo.getRowCount(); i++) {
+
+                table.addCell(modelo.getValueAt(i, 0).toString());
+                table.addCell(modelo.getValueAt(i, 1).toString());
+                table.addCell(modelo.getValueAt(i, 2).toString());
+                table.addCell(modelo.getValueAt(i, 3).toString());
+            }
+
+            doc.add(table);
+            doc.close();
+
+            // 📌 LOG
+            Log.escribir(tipoUsuario, "Exportación PDF Empresas");
+
+            JOptionPane.showMessageDialog(this, "PDF generado correctamente");
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error PDF: " + ex.getMessage());
+        }
     }
 }

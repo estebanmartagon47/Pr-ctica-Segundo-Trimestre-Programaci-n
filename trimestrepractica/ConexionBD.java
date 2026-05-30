@@ -12,9 +12,8 @@ public class ConexionBD {
     // URL de la base de datos
     private static final String URL = "jdbc:mysql://localhost:3306/empresaparquesdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
     // Usuario y contraseña de conexión
-    private static final String USER = "root";
-    private static final String PASSWORD = "Studium2025#";
-
+    private static final String USER = "appuser";
+    private static final String PASSWORD = "1234";
     /**
      * Método estático para obtener la conexión
      * @return Connection

@@ -1,6 +1,8 @@
 package trimestrepractica;
 
 import javax.swing.*;
+import java.awt.Desktop;
+import java.io.File;
 
 /**
  * Menú principal de la aplicación.
@@ -11,7 +13,7 @@ public class MenuPrincipal extends JFrame {
     private static final long serialVersionUID = 1L;
 
     private String tipoUsuario;
-    private JButton btnEmpresas, btnParques, btnAtracciones, btnUsuarios, btnSalir;
+    private JButton btnEmpresas, btnParques, btnAtracciones, btnUsuarios, btnAyuda, btnSalir;
 
     public MenuPrincipal(String tipoUsuario) {
         this.tipoUsuario = tipoUsuario;
@@ -20,7 +22,7 @@ public class MenuPrincipal extends JFrame {
 
     private void initComponents() {
         setTitle("Menú Principal");
-        setSize(400, 400);
+        setSize(400, 450); // 👈 un poco más grande para el botón nuevo
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(null);
@@ -45,9 +47,32 @@ public class MenuPrincipal extends JFrame {
         add(btnUsuarios);
         btnUsuarios.addActionListener(e -> new ConsultaUsuarios(tipoUsuario).setVisible(true));
 
+        // 🔵 BOTÓN AYUDA
+        btnAyuda = new JButton("Ayuda");
+        btnAyuda.setBounds(100, 230, 200, 30);
+        add(btnAyuda);
+
+        btnAyuda.addActionListener(e -> {
+            try {
+                File file = new File("help/index.html");
+                Desktop.getDesktop().browse(file.toURI());
+
+                // 🔥 LOG (esto suma puntos)
+                Log.escribir(tipoUsuario, "Acceso a ayuda");
+
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(null, "No se puede abrir la ayuda");
+            }
+        });
+
         btnSalir = new JButton("Salir");
-        btnSalir.setBounds(100, 230, 200, 30);
+        btnSalir.setBounds(100, 280, 200, 30);
         add(btnSalir);
-        btnSalir.addActionListener(e -> System.exit(0));
+
+        btnSalir.addActionListener(e -> {
+            // 🔥 LOG salida
+            Log.escribir(tipoUsuario, "Salida del sistema");
+            System.exit(0);
+        });
     }
 }
